@@ -12,6 +12,8 @@ import { ArrowLeft, ArrowRight, Check, Phone } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/hooks/use-auth"
 
 const clienteSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -35,6 +37,7 @@ export default function NuevoClientePage() {
   const [selectedPlan, setSelectedPlan] = useState<(typeof mockPlanes)[0] | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
+  const { user } = useAuth()
 
   const {
     register,
@@ -50,28 +53,59 @@ export default function NuevoClientePage() {
   const watchedPlanId = watch("planId")
   const watchedTelefono = watch("telefono")
 
-  const onSubmit = async (data: ClienteForm) => {
-    setIsSubmitting(true)
-
-    // Agregar +591 al teléfono
-    const clienteData = {
-      ...data,
-      telefono: `+591${data.telefono}`,
+  const handleSave = async (data: ClienteForm) => {
+    // Validar que nombre no esté vacío
+    if (!data.nombre || data.nombre.trim() === "") {
+      toast.error("El nombre es obligatorio")
+      return
     }
 
-    console.log("Datos del cliente:", clienteData)
+    // Validar que fecha_fin > fecha_inicio
+    const fechaInicio = new Date()
+    const fechaFin = calculateEndDate()
+    
+    if (!fechaFin) {
+      toast.error("Error al calcular la fecha de vencimiento")
+      return
+    }
 
-    // Simular guardado
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    if (fechaFin <= fechaInicio) {
+      toast.error("La fecha de vencimiento debe ser posterior a la fecha de inicio")
+      return
+    }
 
-    toast.success("¡Cliente registrado exitosamente!", {
-      description: `${data.nombre} ha sido añadido al sistema`,
-    })
+    setIsSubmitting(true)
 
-    setIsSubmitting(false)
+    try {
+      const { error } = await supabase.from("clientes").insert({
+        nombre: data.nombre,
+        ci_nit: data.ci_nit,
+        telefono: `+591${data.telefono}`,
+        email: data.email || null,
+        plan_nombre: selectedPlan?.nombre || "",
+        fecha_inicio: fechaInicio.toISOString(),
+        fecha_fin: fechaFin.toISOString(),
+        estado: "activo",
+        created_by: user?.id,
+      })
 
-    // Redirigir a la lista de clientes
-    router.push("/clientes")
+      if (error) {
+        console.error("Error al guardar cliente:", error)
+        toast.error("Error al registrar el cliente")
+        return
+      }
+
+      toast.success("¡Cliente registrado exitosamente!", {
+        description: `${data.nombre} ha sido añadido al sistema`,
+      })
+
+      router.push("/clientes")
+    } catch (error) {
+      console.error("Error inesperado:", error)
+      toast.error("Error inesperado al registrar el cliente")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handlePlanSelect = (planId: string) => {
@@ -203,7 +237,7 @@ export default function NuevoClientePage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(handleSave)} className="space-y-6">
         <Card className="max-w-4xl">
           <CardHeader>
             <CardTitle>Seleccionar Plan</CardTitle>
