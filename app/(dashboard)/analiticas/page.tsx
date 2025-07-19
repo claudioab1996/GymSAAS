@@ -182,8 +182,8 @@ export default function AnaliticasPage() {
 
                   {/* Data rows */}
                   {heatmapData.map((row) => (
-                    <>
-                      <div key={`${row.hora}-label`} className="p-2 font-medium text-center bg-muted/50 rounded">
+                    <div key={row.hora} className="contents">
+                      <div className="p-2 font-medium text-center bg-muted/50 rounded">
                         {row.hora}
                       </div>
                       <div
@@ -235,7 +235,7 @@ export default function AnaliticasPage() {
                       >
                         {row.domingo}
                       </div>
-                    </>
+                    </div>
                   ))}
                 </div>
               </div>
